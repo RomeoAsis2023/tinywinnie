@@ -101,7 +101,7 @@
     </div>
 
     <!-- v86@0.5.276 from jsDelivr (All files explicitly declared) -->
-    <script src="https://cdn.jsdelivr.net/npm/v86@0.5.276/build/libv86.js"></script>
+    <script src="https://romeoasis2023.github.io/tinywinnie/build/libv86.js"></script>
 
     <script>
         let emulator = null;
@@ -128,9 +128,9 @@
                 cdrom: { url: "https://archive.org/download/tiny-10_202301/tiny10%202303%20x86.iso" },
 
                 // EXPLICIT ABSOLUTE PATHS — NO 404s!
-                wasm_url: "https://cdn.jsdelivr.net/npm/v86@0.5.276/build/v86.wasm",
-                bios: { url: "https://github.com/copy/v86/raw/refs/heads/master/bios/seabios.bin" },
-                vga_bios: { url: "https://github.com/copy/v86/raw/refs/heads/master/bios/vgabios.bin" }
+                wasm_url: "https://romeoasis2023.github.io/tinywinnie/build/v86.wasm",
+                bios: { url: "https://romeoasis2023.github.io/tinywinnie/build/seabios.bin" },
+                vga_bios: { url: "https://romeoasis2023.github.io/tinywinnie/build/vgabios.bin" }
             });
 
             emulator.add_listener("emulator-loaded", () => status.textContent = "Booting Tiny10...");
