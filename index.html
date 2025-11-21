@@ -353,6 +353,17 @@
         }
     }
 
+    function getIsoUrlParam() {
+        const params = new URLSearchParams(location.search);
+        let u = params.get("iso") || "";
+        u = u.trim();
+        if (!u) return null;
+        u = u.replace(/^["'<>\[\(]+|["'<>\]\.\)]+$/g, "");
+        if (u.endsWith(".")) u = u.slice(0, -1);
+        try { new URL(u); } catch (_) { return null; }
+        return u;
+    }
+
     async function startVM(isoBuffer) {
         if (emulator) return;
         const textDiv = screen.querySelector("div");
@@ -381,8 +392,7 @@
             return;
         }
 
-        const params = new URLSearchParams(location.search);
-        const isoUrl = params.get("iso");
+        const isoUrl = getIsoUrlParam();
         if (!isoBuffer && !isoUrl) {
             status.className = "status status-stopped";
             status.textContent = "Provide ISO via ?iso=... or Use Local ISO.";
@@ -400,6 +410,8 @@
                 document.getElementById("start-btn").disabled = false;
                 document.getElementById("stop-btn").disabled = true;
                 document.getElementById("fullscreen-btn").disabled = true;
+                const fileInput = document.getElementById("local-iso-file");
+                if (fileInput) { try { fileInput.click(); } catch (_) {} }
                 return;
             }
         }
@@ -477,8 +489,7 @@
         document.querySelector(".vm-container").appendChild(screen);
     };
 
-    const autoParams = new URLSearchParams(location.search);
-    if (autoParams.get("iso")) {
+    if (getIsoUrlParam()) {
         setTimeout(() => startVM(), 500);
     } else {
         status.className = "status status-stopped";
