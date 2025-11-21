@@ -572,15 +572,17 @@
     };
 
     (function autoStart() {
-        const remote = new URLSearchParams(location.search).get("remote");
-        const pass = new URLSearchParams(location.search).get("pass") || "";
-        if (remote && (remote.startsWith("wss://") || remote.startsWith("ws://"))) {
+        const params = new URLSearchParams(location.search);
+        const remote = params.get("remote");
+        const pass = params.get("pass") || "";
+        const tryConnect = (endpoint, password) => {
+            if (!endpoint || !(endpoint.startsWith("wss://") || endpoint.startsWith("ws://"))) return false;
             screen.style.display = "none";
             vncContainer.style.display = "block";
             try {
                 status.className = "status status-loading";
                 status.textContent = "Connecting Tiny10 (remote)...";
-                rfb = new RFB(vncContainer, remote, pass ? { credentials: { password: pass } } : undefined);
+                rfb = new RFB(vncContainer, endpoint, password ? { credentials: { password: password } } : undefined);
                 rfb.viewOnly = false;
                 rfb.scaleViewport = true;
                 rfb.addEventListener("connect", () => {
@@ -598,21 +600,29 @@
                 vncContainer.style.display = "none";
                 screen.style.display = "block";
             }
-            return;
-        }
-        if (getIsoUrlParam()) {
-            setTimeout(() => startVM(), 500);
-        } else {
-            (async () => {
+            return true;
+        };
+        if (tryConnect(remote, pass)) return;
+        (async () => {
+            try {
+                const res = await fetch("config.json", { cache: "no-store" });
+                if (res.ok) {
+                    const cfg = await res.json();
+                    if (cfg && cfg.remote && tryConnect(String(cfg.remote || "").trim(), String(cfg.pass || "").trim())) return;
+                }
+            } catch (_) {}
+            if (getIsoUrlParam()) {
+                setTimeout(() => startVM(), 500);
+            } else {
                 const assembled = await tryLoadChunkedIso();
                 if (assembled) {
                     await startVM(assembled);
                 } else {
                     status.className = "status status-stopped";
-                    status.textContent = "Add ?iso=URL or Use Local ISO to boot Tiny10.";
+                    status.textContent = "Add ?remote=..., set config.json, ?iso=..., or Use Local ISO.";
                 }
-            })();
-        }
+            }
+        })();
     })();
 
     document.getElementById("local-iso-btn").onclick = () => {
