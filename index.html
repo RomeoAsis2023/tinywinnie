@@ -267,6 +267,8 @@
             <button id="start-btn">Start VM</button>
             <button id="stop-btn" disabled>Stop VM</button>
             <button id="fullscreen-btn" disabled>Fullscreen</button>
+            <button id="local-iso-btn">Use Local ISO</button>
+            <input id="local-iso-file" type="file" accept=".iso" style="display:none" />
         </div>
     </div>
 
@@ -340,7 +342,7 @@
         return results.every(Boolean);
     }
 
-    async function startVM() {
+    async function startVM(isoBuffer) {
         if (emulator) return;
         const textDiv = screen.querySelector("div");
         const canvas = screen.querySelector("canvas");
@@ -382,7 +384,7 @@
             return ar;
         }
 
-        const isoUrl = await resolveIsoUrl();
+        const isoUrl = isoBuffer ? null : await resolveIsoUrl();
 
         try {
             emulator = new V86({
@@ -390,7 +392,7 @@
                 memory_size: parseFloat(ramInput.value) * 1024 * 1024 * 1024,
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
-                cdrom: { url: isoUrl },
+                cdrom: isoBuffer ? { buffer: new Uint8Array(isoBuffer) } : { url: isoUrl },
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
@@ -423,7 +425,7 @@
         });
     }
 
-    document.getElementById("start-btn").onclick = startVM;
+    document.getElementById("start-btn").onclick = () => startVM();
 
     document.getElementById("stop-btn").onclick = () => {
         if (emulator) {
@@ -447,7 +449,31 @@
         document.querySelector(".vm-container").appendChild(screen);
     };
 
-    setTimeout(startVM, 2000);
+    setTimeout(() => startVM(), 2000);
+
+    document.getElementById("local-iso-btn").onclick = () => {
+        const fileInput = document.getElementById("local-iso-file");
+        fileInput.value = "";
+        fileInput.click();
+    };
+
+    document.getElementById("local-iso-file").addEventListener("change", async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        status.className = "status status-loading";
+        status.textContent = "Loading local ISO...";
+        try {
+            const buf = await file.arrayBuffer();
+            if (emulator) {
+                try { emulator.stop(); } catch (_) {}
+                emulator = null;
+            }
+            await startVM(buf);
+        } catch (_) {
+            status.className = "status status-stopped";
+            status.textContent = "Failed to load local ISO.";
+        }
+    });
 
     
 </script>
