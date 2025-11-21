@@ -278,6 +278,7 @@
             <div style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
             <canvas></canvas>
         </div>
+        <div id="vnc_container" style="display:none;width:100%;height:100%;"></div>
 
         <!-- overlay is outside screen_container -->
         <div class="screen-overlay" id="screen-overlay">
@@ -301,10 +302,13 @@
 
 <!-- v86 -->
 <script src="build/libv86.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/novnc@1.5.0/core/rfb.js"></script>
 
 <script>
     let emulator = null;
+    let rfb = null;
     const screen = document.getElementById("screen_container");
+    const vncContainer = document.getElementById("vnc_container");
     const status = document.getElementById("status");
     const progress = document.getElementById("progress-fill");
     const overlay = document.getElementById("screen-overlay");
@@ -465,6 +469,9 @@
         }
 
         console.log("startVM sources", { isoUrl, hasIsoBuffer: !!isoBuffer, hasAssembled: !!assembled, hasCdromCfg: !!cdromCfg });
+        if (!isoBuffer && !assembled && !cdromCfg) {
+            console.warn("No CDROM source found; Tiny10 cannot boot.");
+        }
 
         try {
             const opts = {
@@ -484,6 +491,7 @@
             console.log("v86 opts", opts);
             window.__v86_opts = opts;
             emulator = new V86(opts);
+            window.addEventListener("unload", () => { try { emulator.stop(); } catch (_) {} });
         } catch (e) {
             status.className = "status status-stopped";
             status.textContent = "Failed to start emulator.";
@@ -509,6 +517,13 @@
             if (e.total) {
                 progress.style.width = Math.round(e.loaded / e.total * 100) + "%";
             }
+        });
+
+        emulator.add_listener("cpu-exception", e => {
+            console.warn("CPU exception", e);
+        });
+        emulator.add_listener("on-error", e => {
+            console.error("Emulator error", e);
         });
     }
 
@@ -538,27 +553,67 @@
 
     document.getElementById("fullscreen-btn").onclick = () => {
         document.getElementById("fullscreen-mode").style.display = "flex";
-        document.getElementById("fullscreen-vm").appendChild(screen);
+        const target = document.getElementById("fullscreen-vm");
+        if (vncContainer && vncContainer.style.display !== "none") {
+            target.appendChild(vncContainer);
+        } else {
+            target.appendChild(screen);
+        }
     };
 
     document.getElementById("exit-fullscreen").onclick = () => {
         document.getElementById("fullscreen-mode").style.display = "none";
-        document.querySelector(".vm-container").appendChild(screen);
+        const vmc = document.querySelector(".vm-container");
+        if (vncContainer && vncContainer.parentElement === document.getElementById("fullscreen-vm")) {
+            vmc.appendChild(vncContainer);
+        } else {
+            vmc.appendChild(screen);
+        }
     };
 
-    if (getIsoUrlParam()) {
-        setTimeout(() => startVM(), 500);
-    } else {
-        (async () => {
-            const assembled = await tryLoadChunkedIso();
-            if (assembled) {
-                await startVM(assembled);
-            } else {
+    (function autoStart() {
+        const remote = new URLSearchParams(location.search).get("remote");
+        const pass = new URLSearchParams(location.search).get("pass") || "";
+        if (remote && (remote.startsWith("wss://") || remote.startsWith("ws://"))) {
+            screen.style.display = "none";
+            vncContainer.style.display = "block";
+            try {
+                status.className = "status status-loading";
+                status.textContent = "Connecting Tiny10 (remote)...";
+                rfb = new RFB(vncContainer, remote, pass ? { credentials: { password: pass } } : undefined);
+                rfb.viewOnly = false;
+                rfb.scaleViewport = true;
+                rfb.addEventListener("connect", () => {
+                    status.className = "status status-running";
+                    status.textContent = "Tiny10 connected.";
+                    document.getElementById("fullscreen-btn").disabled = false;
+                });
+                rfb.addEventListener("disconnect", () => {
+                    status.className = "status status-stopped";
+                    status.textContent = "Remote disconnected.";
+                });
+            } catch (_) {
                 status.className = "status status-stopped";
-                status.textContent = "Add ?iso=URL or Use Local ISO to boot Tiny10.";
+                status.textContent = "Remote connection failed.";
+                vncContainer.style.display = "none";
+                screen.style.display = "block";
             }
-        })();
-    }
+            return;
+        }
+        if (getIsoUrlParam()) {
+            setTimeout(() => startVM(), 500);
+        } else {
+            (async () => {
+                const assembled = await tryLoadChunkedIso();
+                if (assembled) {
+                    await startVM(assembled);
+                } else {
+                    status.className = "status status-stopped";
+                    status.textContent = "Add ?iso=URL or Use Local ISO to boot Tiny10.";
+                }
+            })();
+        }
+    })();
 
     document.getElementById("local-iso-btn").onclick = () => {
         const fileInput = document.getElementById("local-iso-file");
