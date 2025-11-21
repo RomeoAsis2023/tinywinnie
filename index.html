@@ -364,6 +364,48 @@
         return u;
     }
 
+    async function tryLoadChunkedIso() {
+        const manifestUrl = "iso/manifest.json";
+        try {
+            const head = await fetch(manifestUrl, { method: "HEAD" });
+            if (!head.ok) return null;
+        } catch (_) {
+            return null;
+        }
+        try {
+            const m = await fetch(manifestUrl).then(r => r.json());
+            if (!m || !m.parts || !Array.isArray(m.parts) || m.parts.length === 0) return null;
+            const total = m.size || m.parts.reduce((s, p) => s + (p.size || 0), 0);
+            if (!total || total <= 0) return null;
+            status.className = "status status-loading";
+            status.textContent = "Assembling ISO from hosted parts...";
+            progress.style.width = "0%";
+            const buf = new Uint8Array(total);
+            const concurrency = 3;
+            let i = 0;
+            let loaded = 0;
+            while (i < m.parts.length) {
+                const batch = [];
+                let batchSize = 0;
+                for (let j = 0; j < concurrency && i < m.parts.length; j++, i++) {
+                    const part = m.parts[i];
+                    const start = loaded + batchSize;
+                    batchSize += part.size || 0;
+                    batch.push((async () => {
+                        const ab = await fetch(part.path).then(r => r.arrayBuffer());
+                        buf.set(new Uint8Array(ab), start);
+                    })());
+                }
+                await Promise.all(batch);
+                loaded += batchSize;
+                progress.style.width = Math.round(loaded / total * 100) + "%";
+            }
+            return buf.buffer;
+        } catch (_) {
+            return null;
+        }
+    }
+
     async function startVM(isoBuffer) {
         if (emulator) return;
         const textDiv = screen.querySelector("div");
@@ -392,17 +434,21 @@
             return;
         }
 
-        const isoUrl = getIsoUrlParam();
+        let isoUrl = getIsoUrlParam();
+        let assembled = null;
         if (!isoBuffer && !isoUrl) {
-            status.className = "status status-stopped";
-            status.textContent = "Provide ISO via ?iso=... or Use Local ISO.";
-            document.getElementById("start-btn").disabled = false;
-            document.getElementById("stop-btn").disabled = true;
-            document.getElementById("fullscreen-btn").disabled = true;
-            return;
+            assembled = await tryLoadChunkedIso();
+            if (!assembled) {
+                status.className = "status status-stopped";
+                status.textContent = "Provide ISO via ?iso=..., Use Local ISO, or host parts.";
+                document.getElementById("start-btn").disabled = false;
+                document.getElementById("stop-btn").disabled = true;
+                document.getElementById("fullscreen-btn").disabled = true;
+                return;
+            }
         }
 
-        if (!isoBuffer) {
+        if (!isoBuffer && !assembled) {
             const ok = await preflightIso(isoUrl);
             if (!ok) {
                 status.className = "status status-stopped";
@@ -420,7 +466,7 @@
                 memory_size: parseFloat(ramInput.value) * 1024 * 1024 * 1024,
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
-                cdrom: isoBuffer ? { buffer: new Uint8Array(isoBuffer) } : { url: isoUrl },
+                cdrom: (isoBuffer || assembled) ? { buffer: new Uint8Array(isoBuffer || assembled) } : { url: isoUrl },
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
