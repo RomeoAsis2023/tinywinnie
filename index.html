@@ -341,6 +341,23 @@
             background: #2ecc71;
         }
         
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(to right, #3498db, #2980b9);
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
         @media (max-width: 768px) {
             .config-grid {
                 grid-template-columns: 1fr;
@@ -418,6 +435,10 @@
                 </div>
             </div>
             
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            
             <div class="button-group">
                 <button id="start-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -455,7 +476,7 @@
                 <li><strong>CPU Cores:</strong> 2 cores (default) - Adequate for typical work tasks</li>
                 <li><strong>Peripherals:</strong> Microphone and webcam enabled for video conferencing</li>
             </ul>
-            <p><strong>Note:</strong> This setup is optimized for the v86 emulator. Performance may vary based on your actual hardware.</p>
+            <p><strong>Note:</strong> This setup uses the latest v86 emulator with WebAssembly for better performance.</p>
         </div>
     </div>
 
@@ -489,6 +510,7 @@
         const cameraToggle = document.getElementById('camera-toggle');
         const micStatus = document.getElementById('mic-status');
         const cameraStatus = document.getElementById('camera-status');
+        const progressFill = document.getElementById('progress-fill');
 
         // Update value displays
         ramSlider.addEventListener('input', () => {
@@ -567,12 +589,13 @@
                 // Load v86 library if not already loaded
                 if (typeof window.V86Starter === 'undefined') {
                     const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/@woodenfish/libv86@0.0.2-alpha.16/build/libv86.min.js';
+                    script.src = 'https://github.com/copy/v86/releases/download/latest/libv86.js';
                     document.head.appendChild(script);
                     
                     // Wait for script to load
-                    await new Promise((resolve) => {
+                    await new Promise((resolve, reject) => {
                         script.onload = resolve;
+                        script.onerror = reject;
                     });
                 }
                 
@@ -585,9 +608,11 @@
                     autostart: true,
                     // Enable network for webcam/microphone access
                     network_enabled: true,
+                    // Use the latest WebAssembly build for better performance
+                    wasm_path: 'https://github.com/copy/v86/releases/download/latest/v86.wasm',
                     // Use minimal BIOS for better performance
-                    bios: { url: 'https://copy.sh/v86/bios/seabios.bin' },
-                    vga_bios: { url: 'https://copy.sh/v86/bios/vgabios.bin' },
+                    bios: { url: 'https://github.com/copy/v86/blob/master/bios/seabios.bin?raw=true' },
+                    vga_bios: { url: 'https://github.com/copy/v86/blob/master/bios/vgabios.bin?raw=true' },
                     // Enable AC97 audio for microphone
                     acpi: true,
                 });
@@ -595,6 +620,7 @@
                 emulator.add_listener("emulator-ready", () => {
                     statusDiv.className = 'status status-running';
                     statusDiv.textContent = 'VM Running - Tiny11 is starting up...';
+                    progressFill.style.width = '100%';
                     
                     // Enable microphone and webcam if selected
                     if (micCheckbox.checked) {
@@ -610,7 +636,14 @@
                     if (e.loaded && e.total) {
                         const percent = Math.round((e.loaded / e.total) * 100);
                         statusDiv.textContent = `Downloading VM image: ${percent}%`;
+                        progressFill.style.width = `${percent}%`;
                     }
+                });
+                
+                emulator.add_listener("error", (e) => {
+                    console.error('VM Error:', e);
+                    statusDiv.className = 'status status-stopped';
+                    statusDiv.textContent = 'VM Error: ' + (e.message || 'Unknown error');
                 });
                 
             } catch (error) {
@@ -626,14 +659,36 @@
         function enableMicrophone() {
             // In a real implementation, this would connect the host microphone to the VM
             console.log("Microphone enabled for VM");
-            // This is a placeholder - actual implementation would require more complex integration
+            
+            // Request microphone access from the browser
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function(stream) {
+                        console.log("Microphone access granted");
+                        // The stream could be passed to the VM in a real implementation
+                    })
+                    .catch(function(err) {
+                        console.error("Microphone access denied:", err);
+                    });
+            }
         }
         
         // Enable webcam in VM
         function enableWebcam() {
             // In a real implementation, this would connect the host webcam to the VM
             console.log("Webcam enabled for VM");
-            // This is a placeholder - actual implementation would require more complex integration
+            
+            // Request camera access from the browser
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(stream) {
+                        console.log("Camera access granted");
+                        // The stream could be passed to the VM in a real implementation
+                    })
+                    .catch(function(err) {
+                        console.error("Camera access denied:", err);
+                    });
+            }
         }
         
         // Stop VM
@@ -645,6 +700,7 @@
                 
                 statusDiv.className = 'status status-stopped';
                 statusDiv.textContent = 'VM Stopped';
+                progressFill.style.width = '0%';
                 
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
