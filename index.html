@@ -483,6 +483,8 @@
             }
         }
 
+        console.log("startVM sources", { isoUrl, hasIsoBuffer: !!isoBuffer, hasAssembled: !!assembled, hasCdromCfg: !!cdromCfg });
+
         try {
             const opts = {
                 screen_container: screen,
@@ -498,6 +500,8 @@
             } else if (cdromCfg) {
                 opts.cdrom = cdromCfg;
             }
+            console.log("v86 opts", opts);
+            window.__v86_opts = opts;
             emulator = new V86(opts);
         } catch (e) {
             status.className = "status status-stopped";
