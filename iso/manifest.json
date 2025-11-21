@@ -1,0 +1,98 @@
+﻿{
+    "parts":  [
+                  {
+                      "path":  "iso\\parts\\part_0001.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0002.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0003.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0004.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0005.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0006.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0007.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0008.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0009.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0010.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0011.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0012.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0013.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0014.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0015.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0016.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0017.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0018.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0019.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0020.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0021.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0022.bin",
+                      "size":  8388608
+                  },
+                  {
+                      "path":  "iso\\parts\\part_0023.bin",
+                      "size":  1338176
+                  }
+              ],
+    "name":  "Tiny10.iso",
+    "size":  185887552
+}
