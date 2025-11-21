@@ -190,10 +190,17 @@
             color: white;
         }
         
-        #start-btn:hover {
+        #start-btn:hover:not(:disabled) {
             background: linear-gradient(to right, #219955, #27ae60);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+        }
+        
+        #start-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         
         #stop-btn {
@@ -201,10 +208,17 @@
             color: white;
         }
         
-        #stop-btn:hover {
+        #stop-btn:hover:not(:disabled) {
             background: linear-gradient(to right, #c0392b, #d35400);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        #stop-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         
         #fullscreen-btn {
@@ -212,10 +226,17 @@
             color: white;
         }
         
-        #fullscreen-btn:hover {
+        #fullscreen-btn:hover:not(:disabled) {
             background: linear-gradient(to right, #2980b9, #1c6ea4);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        #fullscreen-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         
         .vm-container {
@@ -233,6 +254,11 @@
         #screen_container {
             width: 100%;
             height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            flex-direction: column;
         }
         
         .status {
@@ -358,6 +384,30 @@
             transition: width 0.3s;
         }
         
+        .loading-spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .alternative-message {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
         @media (max-width: 768px) {
             .config-grid {
                 grid-template-columns: 1fr;
@@ -452,7 +502,7 @@
                     </svg>
                     Stop VM
                 </button>
-                <button id="fullscreen-btn">
+                <button id="fullscreen-btn" disabled>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M7 14H5V19H10V17H7V14ZM5 10H7V7H10V5H5V10ZM17 17H14V19H19V14H17V17ZM14 5V7H17V10H19V5H14Z" fill="currentColor"/>
                     </svg>
@@ -462,10 +512,23 @@
         </div>
         
         <div class="vm-container">
-            <div id="screen_container"></div>
+            <div id="screen_container">
+                <div class="loading-spinner"></div>
+                <div>Loading v86 emulator...</div>
+            </div>
         </div>
         
-        <div id="status" class="status status-stopped">VM Stopped - Configure and click "Start VM"</div>
+        <div id="status" class="status status-loading">Initializing VM environment...</div>
+        
+        <div class="alternative-message" id="alternative-message" style="display: none;">
+            <h3>Alternative Setup Required</h3>
+            <p>If the v86 emulator fails to load, you can:</p>
+            <ol>
+                <li>Try refreshing the page</li>
+                <li>Use the official v86 demo at <a href="https://copy.sh/v86/" target="_blank">copy.sh/v86</a></li>
+                <li>Check your browser console for detailed error messages</li>
+            </ol>
+        </div>
         
         <div class="recommendations">
             <h3>Recommended Setup for Work/Study</h3>
@@ -476,7 +539,7 @@
                 <li><strong>CPU Cores:</strong> 2 cores (default) - Adequate for typical work tasks</li>
                 <li><strong>Peripherals:</strong> Microphone and webcam enabled for video conferencing</li>
             </ul>
-            <p><strong>Note:</strong> This setup uses the latest v86 emulator with WebAssembly for better performance.</p>
+            <p><strong>Note:</strong> This setup uses the v86 x86 emulator running in your browser.</p>
         </div>
     </div>
 
@@ -511,6 +574,12 @@
         const micStatus = document.getElementById('mic-status');
         const cameraStatus = document.getElementById('camera-status');
         const progressFill = document.getElementById('progress-fill');
+        const alternativeMessage = document.getElementById('alternative-message');
+
+        // VM state
+        let emulator = null;
+        let isFullscreen = false;
+        let v86Loaded = false;
 
         // Update value displays
         ramSlider.addEventListener('input', () => {
@@ -558,62 +627,102 @@
             }
         }
 
-        // VM state
-        let emulator = null;
-        let isFullscreen = false;
+        // Load v86 library with multiple fallback options
+        async function loadV86() {
+            if (v86Loaded) return true;
+            
+            const v86Sources = [               
+                'https://test.1ink.us/rb338/libv86.js',
+                 'https://cdn.jsdelivr.net/npm/@woodenfish/libv86@0.0.2-alpha.16/build/libv86.min.js',
+                'https://github.com/copy/v86/releases/download/latest/libv86.js'
+            ];
+            
+            for (let i = 0; i < v86Sources.length; i++) {
+                const source = v86Sources[i];
+                try {
+                    statusDiv.textContent = `Loading v86 emulator from source ${i + 1}...`;
+                    console.log(`Trying to load v86 from: ${source}`);
+                    
+                    const loaded = await loadScript(source);
+                    if (loaded) {
+                        v86Loaded = true;
+                        statusDiv.textContent = 'v86 emulator loaded successfully!';
+                        console.log('v86 library loaded successfully from:', source);
+                        return true;
+                    }
+                } catch (error) {
+                    console.warn(`Failed to load from ${source}:`, error);
+                    continue;
+                }
+            }
+            
+            // If all sources fail, show alternative message
+            statusDiv.className = 'status status-stopped';
+            statusDiv.textContent = 'Failed to load v86 emulator from all sources.';
+            alternativeMessage.style.display = 'block';
+            return false;
+        }
 
-        // Autostart the VM when page loads
-        window.addEventListener('load', () => {
-            setTimeout(startVM, 1000); // Delay to let page render completely
-        });
+        // Helper function to load a script
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => resolve(true);
+                script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+                document.head.appendChild(script);
+            });
+        }
 
         // Start VM
         async function startVM() {
-            if (emulator) return; // VM already running
+            if (emulator) {
+                console.log('VM already running');
+                return;
+            }
+            
+            if (!v86Loaded) {
+                const loaded = await loadV86();
+                if (!loaded) return;
+            }
             
             statusDiv.className = 'status status-loading';
-            statusDiv.textContent = 'Loading VM... This may take a moment.';
+            statusDiv.textContent = 'Starting VM... This may take a moment.';
             
             startBtn.disabled = true;
             stopBtn.disabled = false;
+            fullscreenBtn.disabled = false;
             
             try {
                 // Convert GB to MB for v86
                 const ramSize = parseInt(ramSlider.value) * 1024 * 1024 * 1024; // Convert to bytes
-                const driveSize = parseInt(driveSlider.value) * 1024 * 1024 * 1024; // Convert to bytes
                 const vgaMemory = parseInt(videoSlider.value) * 1024 * 1024; // Convert to bytes
                 
-                // Clear previous screen
-                screenContainer.innerHTML = '';
+                // Clear previous screen and show loading
+                screenContainer.innerHTML = '<div class="loading-spinner"></div><div>Starting Tiny11 VM...</div>';
                 
-                // Load v86 library if not already loaded
+                // Verify V86Starter is available
                 if (typeof window.V86Starter === 'undefined') {
-                    const script = document.createElement('script');
-                    script.src = 'https://github.com/copy/v86/releases/download/latest/libv86.js';
-                    document.head.appendChild(script);
-                    
-                    // Wait for script to load
-                    await new Promise((resolve, reject) => {
-                        script.onload = resolve;
-                        script.onerror = reject;
-                    });
+                    throw new Error('V86Starter not available after loading');
                 }
+                
+                console.log('Creating V86Starter instance...');
                 
                 // Create emulator with our configuration
                 emulator = new window.V86Starter({
                     memory_size: ramSize,
                     vga_memory: vgaMemory,
                     screen_container: screenContainer,
-                    cdrom: { url: 'https://archive.org/download/tiny11_virtio/tiny11_virtio.iso' },
+                    cdrom: { 
+                        url: 'https://archive.org/download/tiny11_virtio/tiny11_virtio.iso',
+                        async: true
+                    },
                     autostart: true,
-                    // Enable network for webcam/microphone access
                     network_enabled: true,
-                    // Use the latest WebAssembly build for better performance
-                    wasm_path: 'https://github.com/copy/v86/releases/download/latest/v86.wasm',
-                    // Use minimal BIOS for better performance
-                    bios: { url: 'https://github.com/copy/v86/blob/master/bios/seabios.bin?raw=true' },
-                    vga_bios: { url: 'https://github.com/copy/v86/blob/master/bios/vgabios.bin?raw=true' },
-                    // Enable AC97 audio for microphone
+                    // Use relative paths for wasm and bios (they should be in the same directory as libv86.js)
+                    wasm_path: 'v86.wasm',
+                    bios: { url: 'seabios.bin' },
+                    vga_bios: { url: 'vgabios.bin' },
                     acpi: true,
                 });
                 
@@ -621,6 +730,7 @@
                     statusDiv.className = 'status status-running';
                     statusDiv.textContent = 'VM Running - Tiny11 is starting up...';
                     progressFill.style.width = '100%';
+                    console.log('VM is ready');
                     
                     // Enable microphone and webcam if selected
                     if (micCheckbox.checked) {
@@ -635,7 +745,7 @@
                 emulator.add_listener("download-progress", (e) => {
                     if (e.loaded && e.total) {
                         const percent = Math.round((e.loaded / e.total) * 100);
-                        statusDiv.textContent = `Downloading VM image: ${percent}%`;
+                        statusDiv.textContent = `Downloading VM resources: ${percent}%`;
                         progressFill.style.width = `${percent}%`;
                     }
                 });
@@ -646,26 +756,29 @@
                     statusDiv.textContent = 'VM Error: ' + (e.message || 'Unknown error');
                 });
                 
+                console.log('VM creation started successfully');
+                
             } catch (error) {
                 console.error('Failed to start VM:', error);
                 statusDiv.className = 'status status-stopped';
                 statusDiv.textContent = 'Error starting VM: ' + error.message;
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
+                fullscreenBtn.disabled = true;
+                
+                // Show alternative options
+                alternativeMessage.style.display = 'block';
             }
         }
         
         // Enable microphone in VM
         function enableMicrophone() {
-            // In a real implementation, this would connect the host microphone to the VM
             console.log("Microphone enabled for VM");
             
-            // Request microphone access from the browser
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 navigator.mediaDevices.getUserMedia({ audio: true })
                     .then(function(stream) {
                         console.log("Microphone access granted");
-                        // The stream could be passed to the VM in a real implementation
                     })
                     .catch(function(err) {
                         console.error("Microphone access denied:", err);
@@ -675,15 +788,12 @@
         
         // Enable webcam in VM
         function enableWebcam() {
-            // In a real implementation, this would connect the host webcam to the VM
             console.log("Webcam enabled for VM");
             
-            // Request camera access from the browser
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 navigator.mediaDevices.getUserMedia({ video: true })
                     .then(function(stream) {
                         console.log("Camera access granted");
-                        // The stream could be passed to the VM in a real implementation
                     })
                     .catch(function(err) {
                         console.error("Camera access denied:", err);
@@ -696,7 +806,7 @@
             if (emulator) {
                 emulator.stop();
                 emulator = null;
-                screenContainer.innerHTML = '';
+                screenContainer.innerHTML = '<div>VM Stopped</div>';
                 
                 statusDiv.className = 'status status-stopped';
                 statusDiv.textContent = 'VM Stopped';
@@ -704,6 +814,7 @@
                 
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
+                fullscreenBtn.disabled = true;
             }
         }
         
@@ -744,6 +855,23 @@
                 exitFullscreen();
             }
         });
+
+        // Initialize the application
+        async function initializeApp() {
+            // Preload the v86 library
+            await loadV86();
+            
+            // Auto-start the VM after a short delay if loaded successfully
+            if (v86Loaded) {
+                setTimeout(() => {
+                    statusDiv.textContent = 'Auto-starting VM in 3 seconds...';
+                    setTimeout(startVM, 3000);
+                }, 1000);
+            }
+        }
+
+        // Start the application
+        initializeApp();
     </script>
 </body>
 </html>
