@@ -392,7 +392,8 @@
                     const start = loaded + batchSize;
                     batchSize += part.size || 0;
                     batch.push((async () => {
-                        const ab = await fetch(part.path).then(r => r.arrayBuffer());
+                        const path = String(part.path || "").replace(/\\/g, "/");
+                        const ab = await fetch(path).then(r => r.arrayBuffer());
                         buf.set(new Uint8Array(ab), start);
                     })());
                 }
