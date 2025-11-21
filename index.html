@@ -406,12 +406,10 @@
             const ok = await preflightIso(isoUrl);
             if (!ok) {
                 status.className = "status status-stopped";
-                status.textContent = "ISO host blocked by CORS/range. Try Use Local ISO.";
+                status.textContent = "ISO host blocked by CORS/range. Click Use Local ISO.";
                 document.getElementById("start-btn").disabled = false;
                 document.getElementById("stop-btn").disabled = true;
                 document.getElementById("fullscreen-btn").disabled = true;
-                const fileInput = document.getElementById("local-iso-file");
-                if (fileInput) { try { fileInput.click(); } catch (_) {} }
                 return;
             }
         }
