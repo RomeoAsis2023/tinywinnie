@@ -267,6 +267,8 @@
             <button id="start-btn">Start VM</button>
             <button id="stop-btn" disabled>Stop VM</button>
             <button id="fullscreen-btn" disabled>Fullscreen</button>
+            <button id="local-iso-btn">Use Local ISO</button>
+            <input id="local-iso-file" type="file" accept=".iso" style="display:none" />
         </div>
     </div>
 
@@ -351,7 +353,7 @@
         }
     }
 
-    async function startVM() {
+    async function startVM(isoBuffer) {
         if (emulator) return;
         const textDiv = screen.querySelector("div");
         const canvas = screen.querySelector("canvas");
@@ -381,23 +383,25 @@
 
         const params = new URLSearchParams(location.search);
         const isoUrl = params.get("iso");
-        if (!isoUrl) {
+        if (!isoBuffer && !isoUrl) {
             status.className = "status status-stopped";
-            status.textContent = "Provide ISO URL via ?iso=... to start.";
+            status.textContent = "Provide ISO via ?iso=... or Use Local ISO.";
             document.getElementById("start-btn").disabled = false;
             document.getElementById("stop-btn").disabled = true;
             document.getElementById("fullscreen-btn").disabled = true;
             return;
         }
 
-        const ok = await preflightIso(isoUrl);
-        if (!ok) {
-            status.className = "status status-stopped";
-            status.textContent = "ISO host blocked by CORS/range. Use a CORS+range-enabled URL.";
-            document.getElementById("start-btn").disabled = false;
-            document.getElementById("stop-btn").disabled = true;
-            document.getElementById("fullscreen-btn").disabled = true;
-            return;
+        if (!isoBuffer) {
+            const ok = await preflightIso(isoUrl);
+            if (!ok) {
+                status.className = "status status-stopped";
+                status.textContent = "ISO host blocked by CORS/range. Try Use Local ISO.";
+                document.getElementById("start-btn").disabled = false;
+                document.getElementById("stop-btn").disabled = true;
+                document.getElementById("fullscreen-btn").disabled = true;
+                return;
+            }
         }
 
         try {
@@ -406,7 +410,7 @@
                 memory_size: parseFloat(ramInput.value) * 1024 * 1024 * 1024,
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
-                cdrom: { url: isoUrl },
+                cdrom: isoBuffer ? { buffer: new Uint8Array(isoBuffer) } : { url: isoUrl },
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
@@ -478,8 +482,32 @@
         setTimeout(() => startVM(), 500);
     } else {
         status.className = "status status-stopped";
-        status.textContent = "Add ?iso=URL param to boot Tiny10.";
+        status.textContent = "Add ?iso=URL or Use Local ISO to boot Tiny10.";
     }
+
+    document.getElementById("local-iso-btn").onclick = () => {
+        const fileInput = document.getElementById("local-iso-file");
+        fileInput.value = "";
+        fileInput.click();
+    };
+
+    document.getElementById("local-iso-file").addEventListener("change", async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        status.className = "status status-loading";
+        status.textContent = "Loading local ISO...";
+        try {
+            const buf = await file.arrayBuffer();
+            if (emulator) {
+                try { emulator.stop(); } catch (_) {}
+                emulator = null;
+            }
+            await startVM(buf);
+        } catch (_) {
+            status.className = "status status-stopped";
+            status.textContent = "Failed to load local ISO.";
+        }
+    });
 
     
 </script>
