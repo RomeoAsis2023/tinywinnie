@@ -302,7 +302,6 @@
 
 <!-- v86 -->
 <script src="build/libv86.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/novnc@1.5.0/core/rfb.js"></script>
 
 <script>
     let emulator = null;
@@ -576,14 +575,16 @@
         const params = new URLSearchParams(location.search);
         const remote = params.get("remote");
         const pass = params.get("pass") || "";
-        const tryConnect = (endpoint, password) => {
+        const tryConnect = async (endpoint, password) => {
             if (!endpoint || !(endpoint.startsWith("wss://") || endpoint.startsWith("ws://"))) return false;
+            const ok = await ensureNoVNC();
+            if (!ok) return false;
             screen.style.display = "none";
             vncContainer.style.display = "block";
             try {
                 status.className = "status status-loading";
                 status.textContent = "Connecting Tiny10 (remote)...";
-                rfb = new RFB(vncContainer, endpoint, password ? { credentials: { password: password } } : undefined);
+                rfb = new window.RFB(vncContainer, endpoint, password ? { credentials: { password: password } } : undefined);
                 rfb.viewOnly = false;
                 rfb.scaleViewport = true;
                 rfb.addEventListener("connect", () => {
@@ -603,13 +604,13 @@
             }
             return true;
         };
-        if (tryConnect(remote, pass)) return;
+        (async () => { if (await tryConnect(remote, pass)) return; })();
         (async () => {
             try {
                 const res = await fetch("config.json", { cache: "no-store" });
                 if (res.ok) {
                     const cfg = await res.json();
-                    if (cfg && cfg.remote && tryConnect(String(cfg.remote || "").trim(), String(cfg.pass || "").trim())) return;
+                    if (cfg && cfg.remote && await tryConnect(String(cfg.remote || "").trim(), String(cfg.pass || "").trim())) return;
                 }
             } catch (_) {}
             if (getIsoUrlParam()) {
@@ -620,7 +621,7 @@
                     await startVM(assembled);
                 } else {
                     status.className = "status status-stopped";
-                    status.textContent = "Add ?remote=..., set config.json, ?iso=..., or Use Local ISO.";
+                    status.textContent = "Set ?remote=..., add config.json, ?iso=..., or Use Local ISO.";
                 }
             }
         })();
@@ -654,3 +655,13 @@
 </script>
 </body>
 </html>
+    async function ensureNoVNC() {
+        if (window.RFB) return true;
+        return new Promise(resolve => {
+            const s = document.createElement("script");
+            s.src = "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.6.0/lib/rfb.js";
+            s.onload = () => resolve(!!window.RFB);
+            s.onerror = () => resolve(false);
+            document.head.appendChild(s);
+        });
+    }
