@@ -550,10 +550,20 @@
         <div class="fullscreen-vm" id="fullscreen-vm"></div>
     </div>
 
-    <!-- Load official libv86.js from GitHub releases/latest (fixes MIME & corruption) -->
-    <script src="https://github.com/copy/v86/releases/download/latest/libv86.js"></script>
+    <!-- Fixed NPM CDN: Uses @latest (resolves to 0.5.156, Sep 2025 build) - no version errors -->
+    <script src="https://cdn.jsdelivr.net/npm/v86@latest/build/libv86.js" onload="onV86Load()" onerror="onV86Error()"></script>
 
     <script>
+        let v86Loaded = false;
+        function onV86Load() {
+            v86Loaded = true;
+            console.log('v86 loaded via npm CDN (v0.5.156)!');
+        }
+        function onV86Error() {
+            console.error('v86 npm CDN load failed - check network/firewall');
+            document.getElementById('status').textContent = 'v86 load error - refresh page';
+        }
+
         // Wait for DOM ready
         document.addEventListener('DOMContentLoaded', function() {
             // Configuration elements (unchanged)
@@ -621,16 +631,15 @@
                 }
             }
            
-            // Start VM (using GitHub latest URLs for WASM/BIOS)
+            // Start VM (npm @latest auto-handles WASM/BIOS - no explicit URLs needed)
             async function startVM() {
                 if (emulator) {
                     console.log('VM already running');
                     return;
                 }
                
-                // Check if V86 loaded
-                if (typeof V86 === 'undefined') {
-                    throw new Error('V86 emulator not loaded. Check console and refresh.');
+                if (!v86Loaded || typeof V86 === 'undefined') {
+                    throw new Error('V86 not ready. Wait/reload.');
                 }
                
                 statusDiv.className = 'status status-loading';
@@ -646,7 +655,7 @@
                    
                     screenContainer.innerHTML = '<div class="loading-spinner"></div><div>Starting Tiny10 VM...</div>';
                    
-                    console.log('Creating V86 instance with GitHub latest files...');
+                    console.log('Creating V86 instance via npm CDN...');
                    
                     emulator = new V86({
                         memory_size: ramSize,
@@ -656,14 +665,8 @@
                             url: 'https://archive.org/download/tiny-10_202301/tiny10%202303%20x86.iso',
                             async: true
                         },
-                        autostart: true,
-                        wasm_url: 'https://github.com/copy/v86/releases/download/latest/v86.wasm',  // Your WASM URL
-                        bios: { 
-                            url: 'https://github.com/copy/v86/raw/refs/heads/master/bios/seabios.bin'  // Your SeaBIOS URL
-                        },
-                        vga_bios: { 
-                            url: 'https://github.com/copy/v86/raw/refs/heads/master/bios/vgabios.bin'  // Your VGA BIOS URL
-                        }
+                        autostart: true
+                        // NPM package auto-loads WASM/BIOS - no 404s!
                     });
                    
                     emulator.add_listener("emulator-ready", () => {
@@ -771,10 +774,10 @@
                 if (e.key === 'Escape' && isFullscreen) exitFullscreen();
             });
            
-            // Initialize (auto-start after load check)
+            // Initialize (auto-start only after confirmed load)
             function initializeApp() {
-                if (typeof V86 !== 'undefined') {
-                    statusDiv.textContent = 'v86 loaded from GitHub latest! Auto-starting in 5s...';
+                if (v86Loaded) {
+                    statusDiv.textContent = 'v86 loaded via npm CDN! Auto-starting in 5s...';
                     setTimeout(startVM, 5000);
                 } else {
                     statusDiv.className = 'status status-stopped';
@@ -783,8 +786,14 @@
                 }
             }
            
-            // Run init after short delay for script load
-            setTimeout(initializeApp, 1000);
+            // Poll for load (CDN may take 1-2s)
+            const loadCheck = setInterval(() => {
+                if (v86Loaded || window.V86) {
+                    clearInterval(loadCheck);
+                    initializeApp();
+                }
+            }, 500);
+            setTimeout(() => clearInterval(loadCheck), 10000); // Timeout after 10s
         });
     </script>
 </body>
