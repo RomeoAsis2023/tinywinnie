@@ -1,14 +1,14 @@
 param(
     [string]$Url,
-    [string]$Input,
+    [string]$IsoPath,
     [int]$ChunkSizeMB = 8
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not $Url -and -not $Input) { throw "Provide -Url or -Input" }
+if (-not $Url -and -not $IsoPath) { throw "Provide -Url or -IsoPath" }
 
-$isoPath = if ($Input) { $Input } else { Join-Path (Get-Location) "Tiny10.iso" }
+$isoPath = if ($IsoPath) { $IsoPath } else { Join-Path (Get-Location) "Tiny10.iso" }
 
 if ($Url) { Invoke-WebRequest -Uri $Url -OutFile $isoPath -UseBasicParsing }
 
