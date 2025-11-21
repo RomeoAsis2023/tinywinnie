@@ -484,16 +484,21 @@
         }
 
         try {
-            emulator = new V86({
+            const opts = {
                 screen_container: screen,
                 memory_size: parseFloat(ramInput.value) * 1024 * 1024 * 1024,
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
-                cdrom: isoBuffer ? { buffer: new Uint8Array(isoBuffer) } : cdromCfg,
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
-            });
+            };
+            if (isoBuffer) {
+                opts.cdrom = { buffer: new Uint8Array(isoBuffer) };
+            } else if (cdromCfg) {
+                opts.cdrom = cdromCfg;
+            }
+            emulator = new V86(opts);
         } catch (e) {
             status.className = "status status-stopped";
             status.textContent = "Failed to start emulator.";
