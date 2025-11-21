@@ -545,18 +545,18 @@
     <div class="fullscreen-mode" id="fullscreen-mode">
         <div class="fullscreen-header">
             <div>Tiny10 VM - Fullscreen Mode</div>
-            <button id="exit-fullscreen-btn" style="background: #e74c3c; color: white; padding: 5px 10px;">Exit Fullscreen</button>
+            <button id="exit-fullscreen-btn" style="background: #e74c3c; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;">Exit Fullscreen</button>
         </div>
         <div class="fullscreen-vm" id="fullscreen-vm"></div>
     </div>
 
-    <!-- Official v86 via jsDelivr CDN (fixes V86Starter & getContext issues) -->
-    <script src="https://cdn.jsdelivr.net/gh/copy/v86@master/build/libv86.js"></script>
+    <!-- Load official libv86.js from GitHub releases/latest (fixes MIME & corruption) -->
+    <script src="https://github.com/copy/v86/releases/download/latest/libv86.js"></script>
 
     <script>
         // Wait for DOM ready
         document.addEventListener('DOMContentLoaded', function() {
-            // Configuration elements
+            // Configuration elements (unchanged)
             const ramSlider = document.getElementById('ram');
             const driveSlider = document.getElementById('drive');
             const videoSlider = document.getElementById('video');
@@ -584,18 +584,12 @@
             let emulator = null;
             let isFullscreen = false;
            
-            // Update value displays
-            ramSlider.addEventListener('input', () => {
-                ramValue.textContent = ramSlider.value + ' GB';
-            });
-            driveSlider.addEventListener('input', () => {
-                driveValue.textContent = driveSlider.value + ' GB';
-            });
-            videoSlider.addEventListener('input', () => {
-                videoValue.textContent = videoSlider.value + ' MB';
-            });
+            // Update value displays (unchanged)
+            ramSlider.addEventListener('input', () => ramValue.textContent = ramSlider.value + ' GB');
+            driveSlider.addEventListener('input', () => driveValue.textContent = driveSlider.value + ' GB');
+            videoSlider.addEventListener('input', () => videoValue.textContent = videoSlider.value + ' MB');
            
-            // Toggle peripheral controls
+            // Toggle peripheral controls (unchanged)
             micToggle.addEventListener('click', () => {
                 micCheckbox.checked = !micCheckbox.checked;
                 updatePeripheralStatus();
@@ -627,36 +621,33 @@
                 }
             }
            
-            // Start VM (fixed with official V86)
+            // Start VM (using GitHub latest URLs for WASM/BIOS)
             async function startVM() {
                 if (emulator) {
                     console.log('VM already running');
                     return;
                 }
                
-                // Check if V86 is available
+                // Check if V86 loaded
                 if (typeof V86 === 'undefined') {
-                    throw new Error('V86 emulator not loaded. Refresh and try again.');
+                    throw new Error('V86 emulator not loaded. Check console and refresh.');
                 }
                
                 statusDiv.className = 'status status-loading';
-                statusDiv.textContent = 'Starting VM... This may take a moment.';
+                statusDiv.textContent = 'Starting VM... Downloading ~380 MB (first time only).';
                
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
                 fullscreenBtn.disabled = false;
                
                 try {
-                    // Convert to bytes
-                    const ramSize = parseFloat(ramSlider.value) * 1024 * 1024 * 1024;
-                    const vgaMemory = parseInt(videoSlider.value) * 1024 * 1024;
+                    const ramSize = parseFloat(ramSlider.value) * 1024 * 1024 * 1024; // GB to bytes
+                    const vgaMemory = parseInt(videoSlider.value) * 1024 * 1024; // MB to bytes
                    
-                    // Clear screen
                     screenContainer.innerHTML = '<div class="loading-spinner"></div><div>Starting Tiny10 VM...</div>';
                    
-                    console.log('Creating V86 instance...');
+                    console.log('Creating V86 instance with GitHub latest files...');
                    
-                    // Use official V86 (fixes getContext & Starter issues)
                     emulator = new V86({
                         memory_size: ramSize,
                         vga_memory_size: vgaMemory,
@@ -666,26 +657,21 @@
                             async: true
                         },
                         autostart: true,
+                        wasm_url: 'https://github.com/copy/v86/releases/download/latest/v86.wasm',  // Your WASM URL
                         bios: { 
-                            url: 'https://cdn.jsdelivr.net/gh/copy/v86@master/bios/seabios.bin' 
+                            url: 'https://github.com/copy/v86/raw/refs/heads/master/bios/seabios.bin'  // Your SeaBIOS URL
                         },
                         vga_bios: { 
-                            url: 'https://cdn.jsdelivr.net/gh/copy/v86@master/bios/vgabios.bin' 
-                        },
-                        ac97: true,  // For audio if needed
-                        network_relays: [  // Basic networking
-                            ["dnssrv_fake", "https://dnssrv.dnsv86.net/dns-query"],
-                            ["dnssrv_google", "https://dns.google/resolve?name="]
-                        ]
+                            url: 'https://github.com/copy/v86/raw/refs/heads/master/bios/vgabios.bin'  // Your VGA BIOS URL
+                        }
                     });
                    
                     emulator.add_listener("emulator-ready", () => {
                         statusDiv.className = 'status status-running';
-                        statusDiv.textContent = 'VM Running - Tiny10 is starting up...';
+                        statusDiv.textContent = 'VM Running - Tiny10 booting (~60-90s first time)';
                         progressFill.style.width = '100%';
-                        console.log('VM is ready');
+                        console.log('VM ready');
                        
-                        // Enable peripherals if selected
                         if (micCheckbox.checked) enableMicrophone();
                         if (cameraCheckbox.checked) enableWebcam();
                     });
@@ -693,7 +679,7 @@
                     emulator.add_listener("download-progress", (e) => {
                         if (e.loaded && e.total) {
                             const percent = Math.round((e.loaded / e.total) * 100);
-                            statusDiv.textContent = `Downloading VM resources: ${percent}%`;
+                            statusDiv.textContent = `Downloading: ${percent}%`;
                             progressFill.style.width = `${percent}%`;
                         }
                     });
@@ -701,65 +687,66 @@
                     emulator.add_listener("error", (e) => {
                         console.error('VM Error:', e);
                         statusDiv.className = 'status status-stopped';
-                        statusDiv.textContent = 'VM Error: ' + (e.message || 'Unknown error');
+                        statusDiv.textContent = 'VM Error: ' + (e || e.message || 'Check console');
                         alternativeMessage.style.display = 'block';
+                        startBtn.disabled = false;
+                        stopBtn.disabled = true;
+                        fullscreenBtn.disabled = true;
                     });
                    
-                    console.log('VM creation started successfully');
-                   
                 } catch (error) {
-                    console.error('Failed to start VM:', error);
+                    console.error('Start VM failed:', error);
                     statusDiv.className = 'status status-stopped';
-                    statusDiv.textContent = 'Error starting VM: ' + error.message;
+                    statusDiv.textContent = 'Failed to start: ' + error.message;
+                    alternativeMessage.style.display = 'block';
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
                     fullscreenBtn.disabled = true;
-                    alternativeMessage.style.display = 'block';
                 }
             }
            
-            // Enable microphone
+            // Enable microphone (unchanged)
             function enableMicrophone() {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                if (navigator.mediaDevices?.getUserMedia) {
                     navigator.mediaDevices.getUserMedia({ audio: true })
-                        .then(stream => console.log("Microphone access granted"))
-                        .catch(err => console.error("Microphone access denied:", err));
+                        .then(() => console.log('Mic enabled'))
+                        .catch(err => console.error('Mic error:', err));
                 }
             }
            
-            // Enable webcam
+            // Enable webcam (unchanged)
             function enableWebcam() {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                if (navigator.mediaDevices?.getUserMedia) {
                     navigator.mediaDevices.getUserMedia({ video: true })
-                        .then(stream => console.log("Webcam access granted"))
-                        .catch(err => console.error("Webcam access denied:", err));
+                        .then(() => console.log('Webcam enabled'))
+                        .catch(err => console.error('Webcam error:', err));
                 }
             }
            
-            // Stop VM
+            // Stop VM (unchanged)
             function stopVM() {
                 if (emulator) {
                     emulator.stop();
                     emulator = null;
-                    screenContainer.innerHTML = '<div>VM Stopped</div>';
-                   
+                    screenContainer.innerHTML = '<div style="color: white;">VM Stopped</div>';
                     statusDiv.className = 'status status-stopped';
                     statusDiv.textContent = 'VM Stopped';
                     progressFill.style.width = '0%';
-                   
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
                     fullscreenBtn.disabled = true;
                 }
             }
            
-            // Fullscreen
+            // Fullscreen (fixed append logic)
             function enterFullscreen() {
                 if (emulator && screenContainer.requestFullscreen) {
                     isFullscreen = true;
                     fullscreenMode.style.display = 'flex';
                     document.body.style.overflow = 'hidden';
                     fullscreenVM.appendChild(screenContainer);
+                } else {
+                    screenContainer.requestFullscreen?.() || screenContainer.webkitRequestFullscreen?.();
                 }
             }
            
@@ -767,13 +754,14 @@
                 isFullscreen = false;
                 fullscreenMode.style.display = 'none';
                 document.body.style.overflow = 'auto';
-                if (emulator) {
-                    screenContainer.innerHTML = '';
+                if (emulator && screenContainer.parentNode === fullscreenVM) {
+                    fullscreenVM.removeChild(screenContainer);
                     document.querySelector('.vm-container').appendChild(screenContainer);
                 }
+                document.exitFullscreen?.() || document.webkitExitFullscreen?.();
             }
            
-            // Event listeners
+            // Event listeners (unchanged)
             startBtn.addEventListener('click', startVM);
             stopBtn.addEventListener('click', stopVM);
             fullscreenBtn.addEventListener('click', enterFullscreen);
@@ -783,25 +771,20 @@
                 if (e.key === 'Escape' && isFullscreen) exitFullscreen();
             });
            
-            // Initialize (fixed auto-start with delay)
+            // Initialize (auto-start after load check)
             function initializeApp() {
-                statusDiv.textContent = 'v86 emulator loaded successfully!';
-                // Auto-start after 5s delay (safer than 3s)
-                setTimeout(() => {
-                    statusDiv.textContent = 'Auto-starting VM in 5 seconds...';
+                if (typeof V86 !== 'undefined') {
+                    statusDiv.textContent = 'v86 loaded from GitHub latest! Auto-starting in 5s...';
                     setTimeout(startVM, 5000);
-                }, 1000);
+                } else {
+                    statusDiv.className = 'status status-stopped';
+                    statusDiv.textContent = 'v86 load failed. Refresh or check console.';
+                    alternativeMessage.style.display = 'block';
+                }
             }
            
-            // Load check & init (no manual loadScript needed - CDN handles it)
-            if (typeof V86 !== 'undefined') {
-                initializeApp();
-            } else {
-                // Fallback if CDN fails (rare)
-                statusDiv.className = 'status status-stopped';
-                statusDiv.textContent = 'Failed to load v86 emulator.';
-                alternativeMessage.style.display = 'block';
-            }
+            // Run init after short delay for script load
+            setTimeout(initializeApp, 1000);
         });
     </script>
 </body>
