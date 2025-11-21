@@ -368,13 +368,29 @@
             return;
         }
 
+        async function resolveIsoUrl() {
+            const params = new URLSearchParams(location.search);
+            const override = params.get("iso");
+            if (override) return override;
+            const gh = "https://github.com/L36D/Tiny10/releases/download/v1/Tiny10.iso";
+            const ar = "https://archive.org/download/tiny-10_202301/tiny10%202303%20x86.iso";
+            try {
+                const r = await fetch(gh, { method: "HEAD" });
+                const ranges = r.headers.get("accept-ranges") || "";
+                if (r.ok && ranges.indexOf("bytes") !== -1) return gh;
+            } catch (_) {}
+            return ar;
+        }
+
+        const isoUrl = await resolveIsoUrl();
+
         try {
             emulator = new V86({
                 screen_container: screen,
                 memory_size: parseFloat(ramInput.value) * 1024 * 1024 * 1024,
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
-                cdrom: { url: "https://archive.org/download/tiny-10_202301/tiny10%202303%20x86.iso" },
+                cdrom: { url: isoUrl },
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
