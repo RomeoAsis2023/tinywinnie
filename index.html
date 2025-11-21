@@ -567,7 +567,7 @@
                 // Load v86 library if not already loaded
                 if (typeof window.V86Starter === 'undefined') {
                     const script = document.createElement('script');
-                    script.src = 'https://copy.sh/v86/libv86.js';
+                    script.src = 'https://cdn.jsdelivr.net/npm/@woodenfish/libv86@0.0.2-alpha.16/build/libv86.min.js';
                     document.head.appendChild(script);
                     
                     // Wait for script to load
