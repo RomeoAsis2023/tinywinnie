@@ -479,6 +479,7 @@
                 memory_size: Math.floor(parseFloat(ramInput.value) * 1024 * 1024 * 1024),
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
+                boot_order: 0x123,
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
