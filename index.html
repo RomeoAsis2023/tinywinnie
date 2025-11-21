@@ -314,11 +314,9 @@
 
 <!-- v86 -->
 <script src="build/libv86.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@novnc/novnc@1.4.0/core/rfb.min.js"></script>
 
 <script>
     let emulator = null;
-    let rfb = null;
     const screen = document.getElementById("screen_container");
     const status = document.getElementById("status");
     const progress = document.getElementById("progress-fill");
@@ -376,7 +374,7 @@
                 memory_size: parseFloat(ramInput.value) * 1024 * 1024 * 1024,
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
-                cdrom: { url: "https://github.com/L36D/Tiny10/releases/download/v1/Tiny10.iso" },
+                cdrom: { url: "https://archive.org/download/tiny-10_202301/tiny10%202303%20x86.iso" },
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
@@ -435,46 +433,7 @@
 
     setTimeout(startVM, 2000);
 
-    document.getElementById("connect-remote").onclick = () => {
-        if (rfb) return;
-        const url = document.getElementById("vnc-url").value.trim();
-        const pass = document.getElementById("vnc-pass").value;
-        if (!url) {
-            status.className = "status status-stopped";
-            status.textContent = "Enter VNC WebSocket URL.";
-            return;
-        }
-        try {
-            rfb = new RFB(screen, url, { credentials: { password: pass } });
-            rfb.viewOnly = false;
-            rfb.addEventListener("connect", () => {
-                status.className = "status status-running";
-                status.textContent = "Connected to remote Windows.";
-                document.getElementById("disconnect-remote").disabled = false;
-                document.getElementById("connect-remote").disabled = true;
-                if (overlay) overlay.style.display = "none";
-            });
-            rfb.addEventListener("disconnect", () => {
-                status.className = "status status-stopped";
-                status.textContent = "Remote disconnected.";
-                document.getElementById("disconnect-remote").disabled = true;
-                document.getElementById("connect-remote").disabled = false;
-                rfb = null;
-            });
-        } catch (e) {
-            status.className = "status status-stopped";
-            status.textContent = "Failed to connect remote.";
-        }
-    };
-
-    document.getElementById("disconnect-remote").onclick = () => {
-        if (rfb) {
-            try { rfb.disconnect(); } catch (_) {}
-            rfb = null;
-            document.getElementById("disconnect-remote").disabled = true;
-            document.getElementById("connect-remote").disabled = false;
-        }
-    };
+    
 </script>
 </body>
 </html>
