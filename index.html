@@ -337,7 +337,18 @@
 
     async function ensureAssets() {
         const paths = ["build/v86.wasm", "build/seabios.bin", "build/vgabios.bin"];
-        const checks = paths.map(p => fetch(p, { method: "HEAD" }).then(r => r.ok).catch(() => false));
+        const checks = paths.map(async p => {
+            try {
+                const rHead = await fetch(p, { method: "HEAD" });
+                if (rHead.ok) return true;
+            } catch (_) {}
+            try {
+                const rGet = await fetch(p, { method: "GET", cache: "no-store" });
+                return rGet.ok;
+            } catch (_) {
+                return false;
+            }
+        });
         const results = await Promise.all(checks);
         return results.every(Boolean);
     }
@@ -367,13 +378,9 @@
     async function tryLoadChunkedIso() {
         const manifestUrl = "iso/manifest.json";
         try {
-            const head = await fetch(manifestUrl, { method: "HEAD" });
-            if (!head.ok) return null;
-        } catch (_) {
-            return null;
-        }
-        try {
-            const m = await fetch(manifestUrl).then(r => r.json());
+            const r = await fetch(manifestUrl, { cache: "no-store" });
+            if (!r.ok) return null;
+            const m = await r.json();
             if (!m || !m.parts || !Array.isArray(m.parts) || m.parts.length === 0) return null;
             const total = m.size || m.parts.reduce((s, p) => s + (p.size || 0), 0);
             if (!total || total <= 0) return null;
@@ -393,7 +400,9 @@
                     batchSize += part.size || 0;
                     batch.push((async () => {
                         const path = String(part.path || "").replace(/\\/g, "/");
-                        const ab = await fetch(path).then(r => r.arrayBuffer());
+                        const res = await fetch(path);
+                        if (!res.ok) throw new Error("Part fetch failed: " + path);
+                        const ab = await res.arrayBuffer();
                         buf.set(new Uint8Array(ab), start);
                     })());
                 }
@@ -437,9 +446,12 @@
 
         let isoUrl = getIsoUrlParam();
         let assembled = null;
+        let cdromCfg = null;
         if (!isoBuffer && !isoUrl) {
             assembled = await tryLoadChunkedIso();
-            if (!assembled) {
+            if (assembled) {
+                cdromCfg = { buffer: new Uint8Array(assembled) };
+            } else {
                 status.className = "status status-stopped";
                 status.textContent = "Provide ISO via ?iso=..., Use Local ISO, or host parts.";
                 document.getElementById("start-btn").disabled = false;
@@ -449,11 +461,21 @@
             }
         }
 
-        if (!isoBuffer && !assembled) {
-            const ok = await preflightIso(isoUrl);
-            if (!ok) {
+        if (!isoBuffer && !cdromCfg) {
+            if (isoUrl) {
+                const ok = await preflightIso(isoUrl);
+                if (!ok) {
+                    status.className = "status status-stopped";
+                    status.textContent = "ISO host blocked by CORS/range. Click Use Local ISO.";
+                    document.getElementById("start-btn").disabled = false;
+                    document.getElementById("stop-btn").disabled = true;
+                    document.getElementById("fullscreen-btn").disabled = true;
+                    return;
+                }
+                cdromCfg = { url: isoUrl };
+            } else {
                 status.className = "status status-stopped";
-                status.textContent = "ISO host blocked by CORS/range. Click Use Local ISO.";
+                status.textContent = "No ISO specified. Use ?iso=..., Local ISO, or host parts.";
                 document.getElementById("start-btn").disabled = false;
                 document.getElementById("stop-btn").disabled = true;
                 document.getElementById("fullscreen-btn").disabled = true;
@@ -467,7 +489,7 @@
                 memory_size: parseFloat(ramInput.value) * 1024 * 1024 * 1024,
                 vga_memory_size: parseInt(videoInput.value) * 1024 * 1024,
                 autostart: true,
-                cdrom: (isoBuffer || assembled) ? { buffer: new Uint8Array(isoBuffer || assembled) } : { url: isoUrl },
+                cdrom: isoBuffer ? { buffer: new Uint8Array(isoBuffer) } : cdromCfg,
                 wasm_path: "build/v86.wasm",
                 bios: { url: "build/seabios.bin" },
                 vga_bios: { url: "build/vgabios.bin" }
